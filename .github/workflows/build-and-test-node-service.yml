@@ -1,0 +1,87 @@
+name: Build and Test Node JS Service
+
+on:
+  workflow_call:
+    inputs:
+      service-name:
+        description: "Node JS service name"
+        required: true
+        type: string
+      has-tests:
+        description: "Node JS service name"
+        required: false
+        default: true
+        type: boolean
+      publish-master-image:
+        description: "Publish built image from the master branch to the docker registry"
+        required: false
+        default: true
+        type: boolean
+    secrets:
+      aws-access-key-id:
+        description: "AWS access key ID"
+        required: true
+      aws-secret-access-key:
+        description: "AWS secret access key"
+        required: true
+      aws-region:
+        description: "AWS region"
+        required: true
+      aws-ecr-repo:
+        description: "AWS ECR repository name"
+        required: false
+      slack-webhook-url:
+        description: "Slack webhook URL"
+        required: false
+      slack-webhook-channel:
+        description: "Slack webhook channel"
+        required: false
+
+jobs:
+  build_and_test:
+    name: Build and Test
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Cancel Previous Runs
+        uses: styfle/cancel-workflow-action@0.5.0
+        with:
+          access_token: ${{ github.token }}
+
+      - uses: actions/checkout@v2
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.aws-access-key-id }}
+          aws-secret-access-key: ${{ secrets.aws-secret-access-key }}
+          aws-region: ${{ secrets.aws-region }}
+
+      - name: Login to ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build docker image
+        run: docker build -t ${{ inputs.service-name }} .
+
+      - name: Run tests
+        if: "${{ inputs.has-tests }}"
+        run: docker run --env NODE_ENV=test ${{ inputs.service-name }} yarn test
+        timeout-minutes: 3
+
+      - name: Notify test failures
+        if: "failure() && endsWith(github.event.ref, '/master') && inputs.has-tests"
+        uses: rtCamp/action-slack-notify@v2.2.0
+        env:
+          SLACK_WEBHOOK: ${{ secrets.slack-webhook-url }}
+          SLACK_CHANNEL: ${{ secrets.slack-webhook-channel }}
+          SLACK_USERNAME: Github Bot
+          SLACK_MESSAGE: Test suite failures detected in ${{ inputs.service-name }} (master branch)!
+          SLACK_COLOR: danger
+
+      - name: Publish master image
+        if: "endsWith(github.event.ref, '/master') && inputs.publish-master-image"
+        env:
+          MASTER_IMAGE_TAG: ${{ steps.login-ecr.outputs.registry }}/${{ secrets.aws-ecr-repo }}:${{ inputs.service-name }}-master
+        run: docker tag ${{ inputs.service-name }} $MASTER_IMAGE_TAG && docker push $MASTER_IMAGE_TAG
