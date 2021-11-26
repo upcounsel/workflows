@@ -1,0 +1,116 @@
+name: Deploy Node JS Service to AWS ECS
+
+on:
+  workflow_call:
+    inputs:
+      app-name:
+        description: "Node JS app name"
+        required: true
+        type: string
+      task-definition:
+        description: "Task definition file path"
+        required: true
+        type: string
+      aws-ecs-cluster:
+        description: "AWS ECS cluster name"
+        required: true
+        type: string
+      aws-ecs-service:
+        description: "AWS ECS service name"
+        required: true
+        type: string
+      aws-ecr-image-tag:
+        description: "AWS ECR image tag to deploy"
+        required: true
+        type: string
+      after-deploy-script:
+        description: "Script to run after successfull deployment"
+        required: false
+        type: string
+    secrets:
+      deploy-config-key:
+        description: "Key to decrypt deploy config file"
+        required: true
+      slack-webhook-url:
+        description: "Slack webhook URL"
+        required: false
+      slack-webhook-channel:
+        description: "Slack webhook channel"
+        required: false
+
+jobs:
+  deploy:
+    name: Deploy
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/download-artifact@v2
+        with:
+          name: deploy-config
+
+      - name: Load env variables from config file
+        run: |
+          openssl enc -aes-256-cbc -d -a -in .deploy-config.enc -k ${{ secrets.deploy-config-key }} -pbkdf2 >> /tmp/.deploy-config
+          cat /tmp/.deploy-config >> $GITHUB_ENV
+
+      - uses: actions/checkout@v2
+
+      - name: Login ECR
+        id: login-ecr-step
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Export docker image tag
+        run: echo "IMAGE_TAG=${{ steps.login-ecr-step.outputs.registry }}/${{ inputs.aws-ecr-image-tag }}" >> $GITHUB_ENV
+
+      - name: Build and push image to ECR
+        uses: docker/build-push-action@v2
+        with:
+          push: true
+          tags: ${{ env.IMAGE_TAG }}
+
+      - name: Render ECS task definition file
+        uses: danielr1996/envsubst-action@1.0.0
+        with:
+          input: ${{ inputs.task-definition }}
+          output: task-definition-rendered.json
+
+      - name: Notify deploy started
+        uses: rtCamp/action-slack-notify@v2.2.0
+        env:
+          SLACK_WEBHOOK: ${{ secrets.slack-webhook-url }}
+          SLACK_CHANNEL: ${{ secrets.slack-webhook-channel }}
+          SLACK_USERNAME: Github Bot
+          SLACK_MESSAGE: Started deploy of ${{ inputs.app-name }} (${{ github.event.head_commit.message }})
+
+      - name: Deploy Amazon ECS task definition
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: task-definition-rendered.json
+          service: ${{ inputs.aws-ecs-service }}
+          cluster: ${{ inputs.aws-ecs-cluster }}
+          wait-for-service-stability: true
+          wait-for-minutes: 10
+
+      - name: Notify deploy succeeded
+        if: success()
+        uses: rtCamp/action-slack-notify@v2.2.0
+        env:
+          SLACK_WEBHOOK: ${{ secrets.slack-webhook-url }}
+          SLACK_CHANNEL: ${{ secrets.slack-webhook-channel }}
+          SLACK_USERNAME: Github Bot
+          SLACK_MESSAGE: Deploy of ${{ inputs.app-name }} succeeded (${{ github.event.head_commit.message }})
+
+      - name: Notify deploy failed
+        if: failure()
+        uses: rtCamp/action-slack-notify@v2.2.0
+        env:
+          SLACK_WEBHOOK: ${{ secrets.slack-webhook-url }}
+          SLACK_CHANNEL: ${{ secrets.slack-webhook-channel }}
+          SLACK_USERNAME: Github Bot
+          SLACK_MESSAGE: Deploy of ${{ inputs.app-name }} failed (${{ github.event.head_commit.message }})!
+          SLACK_COLOR: danger
+
+      - name: Run after deployment script
+        if: success() && inputs.after-deploy-script
+        run: docker run --env-file /tmp/.deploy-config -e GITHUB_REF -e GITHUB_ACTOR ${{ env.IMAGE_TAG }} ${{ inputs.after-deploy-script }}
