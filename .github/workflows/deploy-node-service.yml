@@ -28,6 +28,9 @@ on:
         required: false
         type: string
     secrets:
+      docker-build-secrets:
+        description: "Build secrets passed as args to docker"
+        required: false
       deploy-config-secret:
         description: "Secret key to decrypt deploy config file"
         required: true
@@ -68,6 +71,7 @@ jobs:
         with:
           push: true
           tags: ${{ env.IMAGE_TAG }}
+          build-args: ${{ secrets.docker-build-secrets }}
 
       - name: Render ECS task definition file
         uses: danielr1996/envsubst-action@1.0.0
