@@ -28,8 +28,8 @@ on:
         required: false
         type: string
     secrets:
-      deploy-config-key:
-        description: "Key to decrypt deploy config file"
+      deploy-config-secret:
+        description: "Secret key to decrypt deploy config file"
         required: true
       slack-webhook-url:
         description: "Slack webhook URL"
@@ -40,7 +40,7 @@ on:
 
 jobs:
   deploy:
-    name: Deploy
+    name: ECS Deploy
 
     runs-on: ubuntu-latest
 
@@ -51,7 +51,7 @@ jobs:
 
       - name: Load env variables from config file
         run: |
-          openssl enc -aes-256-cbc -d -a -in .deploy-config.enc -k ${{ secrets.deploy-config-key }} -pbkdf2 >> /tmp/.deploy-config
+          openssl enc -aes-256-cbc -d -a -in .deploy-config.enc -k ${{ secrets.deploy-config-secret }} -pbkdf2 >> /tmp/.deploy-config
           cat /tmp/.deploy-config >> $GITHUB_ENV
 
       - uses: actions/checkout@v2

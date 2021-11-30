@@ -1,9 +1,9 @@
-name: Checkstyle with ESLisnt
+name: Checkstyle with ESLint
 
 on:
   workflow_call:
     inputs:
-      notify-failure:
+      slack-check-failures:
         description: "Notify eslint check failures via Slack"
         required: true
         default: false
@@ -18,6 +18,8 @@ on:
 
 jobs:
   eslint:
+    name: ESLint
+
     runs-on: ubuntu-latest
 
     steps:
@@ -50,7 +52,7 @@ jobs:
         run: ./node_modules/.bin/eslint .
 
       - name: Eslint failed
-        if: "failure() && inputs.notify-failure"
+        if: "failure() && inputs.slack-check-failures"
         uses: rtCamp/action-slack-notify@v2.2.0
         env:
           SLACK_WEBHOOK: ${{ secrets.slack-webhook-url }}

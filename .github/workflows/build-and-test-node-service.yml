@@ -7,16 +7,25 @@ on:
         description: "Node JS service name"
         required: true
         type: string
-      has-tests:
-        description: "Node JS service name"
+      run-tests:
+        description: "Run test suite"
         required: false
         default: true
         type: boolean
-      publish-master-image:
-        description: "Publish built image from the master branch to the docker registry"
+      slack-test-failures:
+        description: "Notify test suite failures in Slack"
         required: false
-        default: true
+        default: false
         type: boolean
+      publish-built-image:
+        description: "Publish built image to AWS ECR"
+        required: false
+        default: false
+        type: boolean
+      aws-ecr-image-tag:
+        description: "AWS ECR image tag"
+        required: false
+        type: string
     secrets:
       aws-access-key-id:
         description: "AWS access key ID"
@@ -51,7 +60,26 @@ jobs:
 
       - uses: actions/checkout@v2
 
+      - name: Build docker image
+        run: docker build -t ${{ inputs.service-name }} .
+
+      - name: Run tests
+        if: "${{ inputs.run-tests }}"
+        run: docker run --env NODE_ENV=test ${{ inputs.service-name }} yarn test
+        timeout-minutes: 3
+
+      - name: Notify test suite failures
+        if: "failure() && inputs.slack-test-failures && inputs.run-tests"
+        uses: rtCamp/action-slack-notify@v2.2.0
+        env:
+          SLACK_WEBHOOK: ${{ secrets.slack-webhook-url }}
+          SLACK_CHANNEL: ${{ secrets.slack-webhook-channel }}
+          SLACK_USERNAME: Github Bot
+          SLACK_MESSAGE: Test suite failures detected in ${{ inputs.service-name }} (${{ github.event.head_commit.message }})!
+          SLACK_COLOR: danger
+
       - name: Configure AWS credentials
+        if: "inputs.publish-built-image"
         uses: aws-actions/configure-aws-credentials@v1
         with:
           aws-access-key-id: ${{ secrets.aws-access-key-id }}
@@ -59,29 +87,12 @@ jobs:
           aws-region: ${{ secrets.aws-region }}
 
       - name: Login to ECR
+        if: "inputs.publish-built-image"
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
 
-      - name: Build docker image
-        run: docker build -t ${{ inputs.service-name }} .
-
-      - name: Run tests
-        if: "${{ inputs.has-tests }}"
-        run: docker run --env NODE_ENV=test ${{ inputs.service-name }} yarn test
-        timeout-minutes: 3
-
-      - name: Notify test failures
-        if: "failure() && endsWith(github.event.ref, '/master') && inputs.has-tests"
-        uses: rtCamp/action-slack-notify@v2.2.0
+      - name: Publish built image to ECR
+        if: "inputs.publish-built-image"
         env:
-          SLACK_WEBHOOK: ${{ secrets.slack-webhook-url }}
-          SLACK_CHANNEL: ${{ secrets.slack-webhook-channel }}
-          SLACK_USERNAME: Github Bot
-          SLACK_MESSAGE: Test suite failures detected in ${{ inputs.service-name }} (master branch)!
-          SLACK_COLOR: danger
-
-      - name: Publish master image
-        if: "endsWith(github.event.ref, '/master') && inputs.publish-master-image"
-        env:
-          MASTER_IMAGE_TAG: ${{ steps.login-ecr.outputs.registry }}/${{ secrets.aws-ecr-repo }}:${{ inputs.service-name }}-master
-        run: docker tag ${{ inputs.service-name }} $MASTER_IMAGE_TAG && docker push $MASTER_IMAGE_TAG
+          PUBLISH_IMAGE_TAG: ${{ steps.login-ecr.outputs.registry }}/${{ secrets.aws-ecr-repo }}:${{ inputs.aws-ecr-image-tag }}
+        run: docker tag ${{ inputs.service-name }} $PUBLISH_IMAGE_TAG && docker push $PUBLISH_IMAGE_TAG
