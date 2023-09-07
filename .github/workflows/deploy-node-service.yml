@@ -62,6 +62,8 @@ jobs:
       - name: Login ECR
         id: login-ecr-step
         uses: aws-actions/amazon-ecr-login@v1
+        with:
+          mask-password: true
 
       - name: Export docker image tag
         run: echo "IMAGE_TAG=${{ steps.login-ecr-step.outputs.registry }}/${{ inputs.aws-ecr-image-tag }}" >> $GITHUB_ENV
