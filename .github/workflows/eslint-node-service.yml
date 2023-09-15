@@ -32,7 +32,7 @@ jobs:
       - uses: actions/cache@v3
         with:
           path: node_modules
-          key: ${{ runner.os }}-node_modules-v1-${{ steps.nvm.outputs.node_version }}
+          key: ${{ runner.os }}-node_modules-v1-${{ hashFiles('.nvmrc') }}
           restore-keys: |
             ${{ runner.os }}-node_modules-v1
 
@@ -45,7 +45,7 @@ jobs:
         run: yarn
 
       - name: Run eslint
-        run: ./node_modules/.bin/eslint .
+        run: yarn eslint
 
       - name: Eslint failed
         if: "failure() && inputs.slack-check-failures"
