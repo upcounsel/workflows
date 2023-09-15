@@ -26,22 +26,19 @@ jobs:
         with:
           access_token: ${{ github.token }}
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
-      - name: Read Node JS version from .nvmrc
-        run: echo "NODE_VERSION=$(cat .nvmrc)" >> $GITHUB_ENV
-
-      - uses: actions/cache@v2
+      - uses: actions/cache@v3
         with:
           path: node_modules
-          key: ${{ runner.os }}-node_modules-v1-${{ steps.nvm.outputs.node_version }}
+          key: ${{ runner.os }}-node_modules-v1-${{ hashFiles('.nvmrc') }}
           restore-keys: |
             ${{ runner.os }}-node_modules-v1
 
       - name: Setup Node JS
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v3
         with:
-          node-version: "${{ env.NODE_VERSION }}"
+          node-version-file: ".nvmrc"
 
       - name: Install dependencies
         run: yarn
