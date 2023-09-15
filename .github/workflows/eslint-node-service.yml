@@ -47,7 +47,7 @@ jobs:
         run: yarn
 
       - name: Run eslint
-        run: ./node_modules/.bin/eslint .
+        run: yarn eslint
 
       - name: Eslint failed
         if: "failure() && inputs.notify-failure"
