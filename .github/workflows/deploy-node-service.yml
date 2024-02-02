@@ -45,7 +45,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v4
         with:
           name: deploy-config
 
@@ -54,11 +54,11 @@ jobs:
           openssl enc -aes-256-cbc -d -a -in .deploy-config.enc -k ${{ secrets.deploy-config-key }} -pbkdf2 >> /tmp/.deploy-config
           cat /tmp/.deploy-config >> $GITHUB_ENV
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Login ECR
         id: login-ecr-step
-        uses: aws-actions/amazon-ecr-login@v1
+        uses: aws-actions/amazon-ecr-login@v2
 
       - name: Export docker image tag
         run: echo "IMAGE_TAG=${{ steps.login-ecr-step.outputs.registry }}/${{ inputs.aws-ecr-image-tag }}" >> $GITHUB_ENV
