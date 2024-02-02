@@ -59,8 +59,7 @@ jobs:
       group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.head_ref || github.ref }}
       cancel-in-progress: true
 
-    steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Build docker image
         uses: docker/build-push-action@v3
@@ -86,7 +85,7 @@ jobs:
 
       - name: Configure AWS credentials
         if: "inputs.publish-built-image"
-        uses: aws-actions/configure-aws-credentials@v2
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.aws-access-key-id }}
           aws-secret-access-key: ${{ secrets.aws-secret-access-key }}
@@ -95,7 +94,7 @@ jobs:
       - name: Login to ECR
         if: "inputs.publish-built-image"
         id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
+        uses: aws-actions/amazon-ecr-login@v2
         with:
           mask-password: true
 
