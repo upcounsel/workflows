@@ -59,6 +59,7 @@ jobs:
       group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.head_ref || github.ref }}
       cancel-in-progress: true
 
+    steps:
       - uses: actions/checkout@v4
 
       - name: Build docker image
