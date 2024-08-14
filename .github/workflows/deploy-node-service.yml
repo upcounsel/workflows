@@ -117,4 +117,4 @@ jobs:
 
       - name: Run after deployment script
         if: success() && inputs.after-deploy-script
-        run: docker run --env-file /tmp/.deploy-config -e GITHUB_REF -e GITHUB_ACTOR ${{ env.IMAGE_TAG }} ${{ inputs.after-deploy-script }}
+        run: docker run --env-file /tmp/.deploy-config -e GITHUB_REF -e GITHUB_ACTOR -e SERVICE_NAME=${{inputs.app-name}} ${{ env.IMAGE_TAG }} ${{ inputs.after-deploy-script }}
