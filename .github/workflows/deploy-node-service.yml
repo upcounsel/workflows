@@ -48,7 +48,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           name: deploy-config
 
@@ -57,7 +57,7 @@ jobs:
           openssl enc -aes-256-cbc -d -a -in .deploy-config.enc -k ${{ secrets.deploy-config-secret }} -pbkdf2 >> /tmp/.deploy-config
           cat /tmp/.deploy-config >> $GITHUB_ENV
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Login ECR
         id: login-ecr-step
@@ -67,7 +67,7 @@ jobs:
         run: echo "IMAGE_TAG=${{ steps.login-ecr-step.outputs.registry }}/${{ inputs.aws-ecr-image-tag }}" >> $GITHUB_ENV
 
       - name: Build and push image to ECR
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           push: true
           tags: ${{ env.IMAGE_TAG }}
